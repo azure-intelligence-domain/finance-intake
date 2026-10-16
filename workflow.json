@@ -1,0 +1,133 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0",
+  "parameters": {
+    "gateway": {
+      "type": "String",
+      "defaultValue": "https://apim-intplat-demo.azure-api.net"
+    }
+  },
+  "triggers": {
+    "event": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST"
+      },
+      "description": "One CloudEvent, delivered by the platform's event intake (ADR 0016)."
+    }
+  },
+  "actions": {
+    "Event": {
+      "type": "Compose",
+      "inputs": "@triggerBody()",
+      "runAfter": {}
+    },
+    "Route": {
+      "type": "Switch",
+      "expression": "@outputs('Event')?['type']",
+      "runAfter": {
+        "Event": [
+          "Succeeded"
+        ]
+      },
+      "cases": {
+        "OrderPlaced": {
+          "case": "com.acme.order.placed",
+          "actions": {
+            "Lines": {
+              "type": "Select",
+              "inputs": {
+                "from": "@outputs('Event')?['data']?['orderLines']",
+                "select": {
+                  "lineNumber": "@item()?['lineNumber']",
+                  "productId": "@item()?['productId']",
+                  "quantity": "@item()?['quantity']",
+                  "unitPrice": "@item()?['unitPrice']"
+                }
+              }
+            },
+            "Create_sales_order": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@{parameters('gateway')}/sap/sales-orders",
+                "headers": {
+                  "Content-Type": "application/json",
+                  "Correlation-Id": "@{outputs('Event')?['correlationid']}",
+                  "traceparent": "@{coalesce(triggerOutputs()?['headers']?['traceparent'], '')}"
+                },
+                "body": {
+                  "orderId": "@outputs('Event')?['data']?['orderId']",
+                  "customerId": "@outputs('Event')?['data']?['customerId']",
+                  "orderLines": "@body('Lines')",
+                  "totalAmount": "@outputs('Event')?['data']?['totalAmount']"
+                },
+                "authentication": {
+                  "type": "ManagedServiceIdentity",
+                  "identity": "__IDENTITY__",
+                  "audience": "__AUDIENCE__"
+                },
+                "retryPolicy": {
+                  "type": "none"
+                }
+              },
+              "runAfter": {
+                "Lines": [
+                  "Succeeded"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "default": {
+        "actions": {}
+      }
+    },
+    "Handled": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Route": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "flow": "finance-intake",
+          "event": "@{outputs('Event')?['type']}",
+          "id": "@{outputs('Event')?['id']}"
+        }
+      }
+    },
+    "Failed": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Route": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "inputs": {
+        "statusCode": 502,
+        "headers": {
+          "Content-Type": "application/problem+json"
+        },
+        "body": {
+          "type": "https://github.com/azure-intelligence-domain/finance-intake/blob/main/README.md#when-a-delivery-fails",
+          "title": "Delivery Failed",
+          "status": 502,
+          "detail": "finance-intake could not hand the event to the SAP System API; Event Grid retries, then dead-letters.",
+          "instance": "@{outputs('Event')?['id']}"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

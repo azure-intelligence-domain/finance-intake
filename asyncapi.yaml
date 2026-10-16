@@ -1,0 +1,60 @@
+asyncapi: 2.6.0
+id: urn:azure-intelligence-domain:finance:finance-intake
+info:
+  title: '[Finance] Finance Intake'
+  version: 1.0.0
+  description: 'What the finance domain takes in from other domains: OrderPlaced, which finance-intake creates the
+    sales order in SAP (credit check, billing). A consumer contract: it only receives (ADR 0009, 0015).'
+  contact:
+    name: Finance Domain Team
+    url: https://github.com/azure-intelligence-domain/finance-intake
+  license:
+    name: MIT
+    url: https://github.com/azure-intelligence-domain/finance-intake/blob/main/LICENSE
+tags:
+- name: finance
+  description: Finance domain.
+externalDocs:
+  description: EventCatalog entry of the finance domain
+  url: https://azure-intelligence-domain.github.io/eventcatalog/docs/domains/finance/1.0.0
+defaultContentType: application/cloudevents+json
+servers:
+  demo-event-grid:
+    $ref: https://raw.githubusercontent.com/azure-intelligence-domain/contracts/v1.2.0/asyncapi/landscape.asyncapi.yaml#/components/servers/demo-event-grid
+channels:
+  order.process-api-order.event.order-placed:
+    description: OrderPlaced, published by the Order Process API; finance-intake creates the sales order in SAP
+      (credit check, billing).
+    servers:
+    - demo-event-grid
+    x-configurations:
+      demo:
+        eventGrid:
+          topic: evgt-intplat-order
+          eventType: com.acme.order.placed
+    subscribe:
+      operationId: receiveOrderPlaced
+      summary: Receive OrderPlaced.
+      description: finance-intake receives OrderPlaced through the platform's event intake (subscription finance-intake)
+        and creates the sales order in SAP (credit check, billing), through the gateway.
+      security:
+      - platformIntake: []
+      tags:
+      - name: finance
+        description: Finance domain.
+      externalDocs:
+        description: The finance-intake flow
+        url: https://github.com/azure-intelligence-domain/finance-intake
+      x-consumers:
+        demo:
+        - finance-intake
+      message:
+        $ref: https://raw.githubusercontent.com/azure-intelligence-domain/process-api-order/v1.1.0/asyncapi.yaml#/components/messages/orderPlaced
+components:
+  securitySchemes:
+    platformIntake:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: The platform's event intake delivers with an Entra ID token of the gateway's managed identity
+        for the intplat-platform-apis application; the Logic App's OAuth policy lets only that in (ADR 0016).
