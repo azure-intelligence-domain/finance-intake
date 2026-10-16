@@ -18,16 +18,16 @@
     }
   },
   "actions": {
-    "Event": {
+    "CloudEvent": {
       "type": "Compose",
       "inputs": "@triggerBody()",
       "runAfter": {}
     },
     "Route": {
       "type": "Switch",
-      "expression": "@outputs('Event')?['type']",
+      "expression": "@outputs('CloudEvent')?['type']",
       "runAfter": {
-        "Event": [
+        "CloudEvent": [
           "Succeeded"
         ]
       },
@@ -38,7 +38,7 @@
             "Lines": {
               "type": "Select",
               "inputs": {
-                "from": "@outputs('Event')?['data']?['orderLines']",
+                "from": "@outputs('CloudEvent')?['data']?['orderLines']",
                 "select": {
                   "lineNumber": "@item()?['lineNumber']",
                   "productId": "@item()?['productId']",
@@ -54,14 +54,14 @@
                 "uri": "@{parameters('gateway')}/sap/sales-orders",
                 "headers": {
                   "Content-Type": "application/json",
-                  "Correlation-Id": "@{outputs('Event')?['correlationid']}",
+                  "Correlation-Id": "@{outputs('CloudEvent')?['correlationid']}",
                   "traceparent": "@{coalesce(triggerOutputs()?['headers']?['traceparent'], '')}"
                 },
                 "body": {
-                  "orderId": "@outputs('Event')?['data']?['orderId']",
-                  "customerId": "@outputs('Event')?['data']?['customerId']",
+                  "orderId": "@outputs('CloudEvent')?['data']?['orderId']",
+                  "customerId": "@outputs('CloudEvent')?['data']?['customerId']",
                   "orderLines": "@body('Lines')",
-                  "totalAmount": "@outputs('Event')?['data']?['totalAmount']"
+                  "totalAmount": "@outputs('CloudEvent')?['data']?['totalAmount']"
                 },
                 "authentication": {
                   "type": "ManagedServiceIdentity",
@@ -100,8 +100,8 @@
         },
         "body": {
           "flow": "finance-intake",
-          "event": "@{outputs('Event')?['type']}",
-          "id": "@{outputs('Event')?['id']}"
+          "event": "@{outputs('CloudEvent')?['type']}",
+          "id": "@{outputs('CloudEvent')?['id']}"
         }
       }
     },
@@ -124,7 +124,7 @@
           "title": "Delivery Failed",
           "status": 502,
           "detail": "finance-intake could not hand the event to the SAP System API; Event Grid retries, then dead-letters.",
-          "instance": "@{outputs('Event')?['id']}"
+          "instance": "@{outputs('CloudEvent')?['id']}"
         }
       }
     }
