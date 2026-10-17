@@ -2,9 +2,10 @@ asyncapi: 2.6.0
 id: urn:azure-intelligence-domain:finance:finance-intake
 info:
   title: '[Finance] Finance Intake'
-  version: 1.0.0
+  version: 1.1.0
   description: 'What the finance domain takes in from other domains: OrderPlaced, which finance-intake creates the
-    sales order in SAP (credit check, billing). A consumer contract: it only receives (ADR 0009, 0015).'
+    sales order in SAP (credit check, billing), and OrderCancelled, which it cancels the SAP sales order (a credit
+    note reverses the invoice) (since 1.1.0). A consumer contract: it only receives (ADR 0009, 0015, 0018).'
   contact:
     name: Finance Domain Team
     url: https://github.com/azure-intelligence-domain/finance-intake
@@ -50,6 +51,35 @@ channels:
         - finance-intake
       message:
         $ref: https://raw.githubusercontent.com/azure-intelligence-domain/process-api-order/v1.1.0/asyncapi.yaml#/components/messages/orderPlaced
+  order.process-api-order.event.order-cancelled:
+    description: OrderCancelled, published by the Order Process API; finance-intake cancels the SAP sales order
+      (a credit note reverses the invoice), publishing SalesOrderCancelled.
+    servers:
+    - demo-event-grid
+    x-configurations:
+      demo:
+        eventGrid:
+          topic: evgt-intplat-order
+          eventType: com.acme.order.cancelled
+    subscribe:
+      operationId: receiveOrderCancelled
+      summary: Receive OrderCancelled.
+      description: finance-intake receives OrderCancelled through the platform's event intake (subscription finance-intake)
+        and cancels the SAP sales order (a credit note reverses the invoice), publishing SalesOrderCancelled, through
+        the gateway.
+      security:
+      - platformIntake: []
+      tags:
+      - name: finance
+        description: Finance domain.
+      externalDocs:
+        description: The finance-intake flow
+        url: https://github.com/azure-intelligence-domain/finance-intake
+      x-consumers:
+        demo:
+        - finance-intake
+      message:
+        $ref: https://raw.githubusercontent.com/azure-intelligence-domain/process-api-order/v1.2.0/asyncapi.yaml#/components/messages/orderCancelled
 components:
   securitySchemes:
     entraIdEventGrid:

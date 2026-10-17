@@ -79,6 +79,52 @@
               }
             }
           }
+        },
+        "OrderCancelled": {
+          "case": "com.acme.order.cancelled",
+          "actions": {
+            "Has_erpOrderNumber": {
+              "type": "If",
+              "runAfter": {},
+              "expression": {
+                "and": [
+                  {
+                    "not": {
+                      "equals": [
+                        "@coalesce(outputs('CloudEvent')?['data']?['erpOrderNumber'], '')",
+                        ""
+                      ]
+                    }
+                  }
+                ]
+              },
+              "actions": {
+                "Cancel_sales_order": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "DELETE",
+                    "uri": "@{parameters('gateway')}/sap/sales-orders/@{encodeUriComponent(outputs('CloudEvent')?['data']?['erpOrderNumber'])}?reason=@{encodeUriComponent(coalesce(outputs('CloudEvent')?['data']?['reason'], 'Order cancelled.'))}",
+                    "headers": {
+                      "Content-Type": "application/json",
+                      "Correlation-Id": "@{outputs('CloudEvent')?['correlationid']}",
+                      "traceparent": "@{coalesce(triggerOutputs()?['headers']?['traceparent'], '')}"
+                    },
+                    "authentication": {
+                      "type": "ManagedServiceIdentity",
+                      "identity": "__IDENTITY__",
+                      "audience": "__AUDIENCE__"
+                    },
+                    "retryPolicy": {
+                      "type": "none"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              }
+            }
+          }
         }
       },
       "default": {

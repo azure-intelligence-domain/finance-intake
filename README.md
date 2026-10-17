@@ -4,6 +4,7 @@ The **finance domain's intake flow** ([ADR 0015](https://github.com/azure-intell
 what the finance domain takes in from other domains. A Logic App (Consumption), owned by the
 **finance-team**. It receives **OrderPlaced** and creates the sales order in SAP, through the gateway, with the
 SAP System API; the System API then publishes SalesOrderAccepted / SalesOrderRefused and InvoiceIssued.
+It also receives **OrderCancelled** (below).
 
 | File | What |
 |---|---|
@@ -35,6 +36,20 @@ The flow maps the order domain's event onto the SAP System API's contract; nothi
 ```mermaid
 flowchart LR
     ev["OrderPlaced<br/>(order domain contract)"] -- "workflow.json" --> req["/sap/sales-orders<br/>(SAP System API contract)"]
+```
+
+## When an order is cancelled (since 1.1.0)
+
+**OrderCancelled** names what each domain has for the order ([ADR 0018](https://github.com/azure-intelligence-domain/ai-intelligence-domain/blob/main/docs/adr/0018-cancellation-reaches-every-domain.md)).
+If it carries `erpOrderNumber`, the flow cancels the SAP sales order; a credit note reverses the invoice: `DELETE /sap/sales-orders/{erpOrderNumber}?reason=`, and the SAP System API
+publishes **SalesOrderCancelled**. Without `erpOrderNumber` the SAP has nothing for this order yet, and the run ends
+`200` without a call.
+
+```mermaid
+flowchart LR
+    oc[["OrderCancelled<br/>erpOrderNumber"]] --> c{"erpOrderNumber set?"}
+    c -- yes --> d["DELETE /sap/sales-orders/{erpOrderNumber}"] --> f[["SalesOrderCancelled"]]
+    c -- no --> n["nothing to undo: 200"]
 ```
 
 ## When a delivery fails
